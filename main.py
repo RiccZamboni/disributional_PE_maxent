@@ -40,7 +40,7 @@ if(__name__ == '__main__'):
     # Checking of the parameters validity
     environment = 'StochasticGridWorld_2D'
 
-    # Name of the file for saving the RL policy learned
+    # Name of the file for saving the RL policy learner
     fileName = 'SavedModels/'+ '_' + environment + '{}'.format(time.time())
     
     # Initialization of the RL environment
