@@ -71,9 +71,9 @@ class MonteCarloSampling():
         return trajectories
 
 
-    def generate_return_distribution_from_trajectories(self, trajectories):
+    def generate_return_distribution_from_trajectories(self, trajectories, samples_limit):
         z_samples = list()
-        for tr in range(self.trajSamples):
+        for tr in range(samples_limit):
             traj_i = trajectories[tr]
             G = 0
             for t in reversed(range(0, len(trajectories[tr]))):
@@ -89,10 +89,8 @@ class MonteCarloSampling():
         for z in z_samples:
             state = [idx for idx in range(len(self.env.state_space))  if self.env.state_space[idx] == z[0]]
             g_ind = [idx for idx in range(len(self.env.return_space))  if self.env.return_space[idx] == z[1]]
-            counters[state] +=1
             eta_MC[state, g_ind] +=1
-        for s in range(self.env.d_tuple[0]):
-            eta_MC[s][:] = eta_MC[s][:]/counters[s]
+        eta_MC = eta_MC/len(z_samples)
         return eta_MC
 
 

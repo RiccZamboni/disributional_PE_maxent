@@ -14,7 +14,7 @@ from datetime import datetime
 from environment import StochasticGridWorld_2D as StochasticGridWorld_2D
 from environment import RandomPolicy as RandomPolicy, UpperPolicy
 
-from Utils import plot_solution, compute_kl, compare_values
+from Utils import plot_solution, compute_kl, compare_values, return_percentages, plot
 from UCF import UCF as UCF
 from MCSampling import MonteCarloSampling as MonteCarloSampling
 
@@ -33,8 +33,8 @@ if(__name__ == '__main__'):
     # Retrieve the paramaters sent by the user
     parser = argparse.ArgumentParser(description='')
     parser.add_argument("-splits", default=2, type=int, help="number of splits")
-    parser.add_argument("-samples", default=1000, type=int, help="number of samples")
-    parser.add_argument("-environment_size", default=4, type=int, help="environment size")
+    parser.add_argument("-samples", default=10000, type=int, help="number of samples")
+    parser.add_argument("-environment_size", default=2, type=int, help="environment size")
     parser.add_argument("-environment_type", default='ICED', type=str, help="environment type")
     parser.add_argument("-full_search", default=False, type=bool, help="search type")
     parser.add_argument("-vectorized", default=True, type=str, help="vectorized features")
@@ -62,24 +62,10 @@ if(__name__ == '__main__'):
     z_samples = sampler.generate_return_distribution_from_trajectories(trajetories, samples_n)
     eta_MC = sampler.estimate_distribution_DKW(z_samples)
     env.true_dist = eta_MC
-    Agent_full_search = UCF(env, policy = policy, samples = z_samples, 
-    vectorized = vectorized, gamma = 0.98, trajSamples= samples_n)
-
-    if args.full_search:
-      search_dict = Agent_full_search.search(hyper_c=1, splits=n_splits)
-
-    with open("full_search_dict_{}_{}_{}_{}.json".format(env.size, type_env, samples_n, dt_string), "w") as outfile:
-          json.dump(search_dict, outfile)
-
-    z_samples = sampler.generate_return_distribution_from_trajectories(trajetories, samples_n)
-    
-    Agent = UCF(env, policy = policy, samples = z_samples, 
-    vectorized = vectorized, gamma = 0.98, trajSamples= samples_n)
 
     print("#######")
     print("Factor init")
     print("Type {}".format(type_env))
-    print("Samples {}".format(samples_n))
     print("Size {}".format(size))
     print("Splits {}".format(n_splits))
     print("#######")
@@ -87,20 +73,34 @@ if(__name__ == '__main__'):
     greedy_search_dict = dict()
     greedy_search_dict['INFO'] = {
      "Type" : str(type_env),
-     "Samples" : str(samples_n),
+     "Samples_TOT" : str(samples_n),
      "Size" : str(size),
      "Splits" : str(n_splits)
     }
-    
 
-    greedy_search_dict, eta_hat, eta_hat_full = Agent.greedy_search(greedy_search_dict, hyper_c=1, splits=n_splits)
+    kl_est  = list()
+    kl_full = list()
+    RMSE_est = list()
+    RMSE_full = list()
+    resolution = 10
+    percentages_n = return_percentages(samples_n, resolution)
+    for n in percentages_n:
+      greedy_search_dict[str(n)] = dict()
+      n_samples = sampler.generate_return_distribution_from_trajectories(trajetories, n)
+      
+      Agent = UCF(env, policy = policy, samples = n_samples, 
+      vectorized = vectorized, gamma = 0.98, trajSamples= n)
+      greedy_search_dict[str(n)], eta_hat, eta_hat_full = Agent.greedy_search(greedy_search_dict[str(n)], hyper_c=1000, splits=n_splits)
+      kl_est.append(compute_kl(env, env.true_dist, eta_hat))
+      kl_full.append(compute_kl(env, env.true_dist, eta_hat_full))
+      est, full = compare_values(env, eta_hat, eta_hat_full, env.true_dist)
+      RMSE_est.append(est)
+      RMSE_full.append(full)
+      pass
 
+    plot(RMSE_est, RMSE_full, percentages_n, 'RMSE', "greedy_search_dict_{}_{}_{}_{}.json".format(env.size, type_env, samples_n, dt_string))
+    plot(kl_est, kl_est, percentages_n, 'KL-divergence', "greedy_search_dict_{}_{}_{}_{}.json".format(env.size, type_env, samples_n, dt_string))
 
-    with open("greedy_search_dict_{}_{}_{}_{}.json".format(env.size, type_env, samples_n, dt_string), "w") as outfile:
-         json.dump(greedy_search_dict, outfile)
-
-
-    # kl_est = compute_kl(env, env.true_dist, eta_hat)
-    # kl_full = compute_kl(env, env.true_dist, eta_hat_full)
-    # compare_values(eta_hat, eta_hat_full, env.true_dist)
+    # with open("results/greedy_search_dict_{}_{}_{}_{}.json".format(env.size, type_env, samples_n, dt_string), "w") as outfile:
+    #      json.dump(greedy_search_dict, outfile)
     pass

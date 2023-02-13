@@ -57,7 +57,7 @@ class StochasticGridWorld_2D(gym.Env):
              - render: Render graphically the current state of the RL environment.
     """
 
-    def __init__(self, s=S):
+    def __init__(self, s=S, type='STD'):
         """
         GOAL: Perform the initialization of the RL environment.
         
@@ -86,21 +86,35 @@ class StochasticGridWorld_2D(gym.Env):
         # self.state_space = list(product(np.arange(0, S), np.arange(0, S)))
         state_space = np.arange(0, self.size*self.size, dtype=int)
         # spaces.Box(low=np.array([0, 0, self.std_color]), high=np.array([size-1, size-1, self.target_color]), dtype=np.uint8)
-        self.action_space = np.arange(0, 4 , dtype=int)
-        return_space = np.arange(2*self.R_min, 2*self.R_max, 0.1)
-        self.return_space =  [round(r,1) for r in return_space]
-        
+        self.action_space = np.arange(0, 4, dtype=int)
+        return_space = np.arange(self.R_min, self.R_max + 0.09, 0.1)
 
+        self.return_space =  [round(r,1) if np.abs(r) > 0.01 else 0.0 for r in return_space]
         ################### Initialization of the traps and target positions ############################
         l = self.size - 1
 
         # self.trapPosition =  [[1, 0], [2, 0], [3, 0]]
-        self.trapPosition =  [[i+1, 0] for i in range(self.size - 1)]
+        if type == 'ICED':
+        # self.trapPosition =  [[i+1, 0] for i in range(self.size - 1)]
+            self.trapPosition =  [[i+1, 0] for i in range(self.size - 2)]
+            self.targetPosition = [[l,  0]]
+        elif type == 'DOUBLE':
+        # self.trapPosition =  [[i+1, 0] for i in range(self.size - 1)]
+            self.trapPosition =  [[i, 1] for i in range(self.size)]
+            self.targetPosition = [[i, l] for i in range(self.size)]
+        elif type == 'DOUBLE_POS':
+        # self.trapPosition =  [[i+1, 0] for i in range(self.size - 1)]
+            self.trapPosition =  []
+            self.targetPosition = [[i, j] for i in range(self.size) for j in [1, l]]
+        else:
+            self.trapPosition =  [[i+1, 0] for i in range(self.size - 1)]
+            self.targetPosition = [[l,  l]]
+
         trapPosition = [self.get_state(t) for t in self.trapPosition]
+        targetPosition = [self.get_state(r) for r in self.targetPosition]
         self.wallPosition =  []
         wallPosition = [self.get_state(w) for w in self.wallPosition]
-        self.targetPosition = [l,  l]
-        targetPosition = [self.get_state(self.targetPosition)]
+        
         self.state_space = list()
         for s in state_space:
             if (s not in trapPosition and s not in wallPosition and s not in targetPosition):
@@ -110,7 +124,8 @@ class StochasticGridWorld_2D(gym.Env):
 
         # Initialization of the player position
         self.agentPosition = [random.randint(0,self.size-1), random.randint(0,self.size-1)]
-        while self.agentPosition == self.targetPosition or self.agentPosition in self.trapPosition or self.agentPosition in self.wallPosition:
+        # while self.agentPosition == self.targetPosition or self.agentPosition in self.trapPosition or self.agentPosition in self.wallPosition:
+        while self.agentPosition in self.targetPosition or self.agentPosition in self.trapPosition or self.agentPosition in self.wallPosition:
             self.agentPosition = [random.randint(0,self.size-1), random.randint(0,self.size-1)]
 
         # Initialization of the time elapsed
@@ -122,6 +137,7 @@ class StochasticGridWorld_2D(gym.Env):
         self.reward = 0.
         self.done = 0
         self.info = {}
+        self.true_dist = None
 
     def reset(self):
         """
@@ -135,7 +151,7 @@ class StochasticGridWorld_2D(gym.Env):
         # Reset of the player position and time elapsed
         # int(random.random() * (self.size-1))
         self.agentPosition = [random.randint(0,self.size-1), random.randint(0,self.size-1)]
-        while self.agentPosition == self.targetPosition or self.agentPosition in self.trapPosition or self.agentPosition in self.wallPosition:
+        while self.agentPosition in self.targetPosition or self.agentPosition in self.trapPosition or self.agentPosition in self.wallPosition:
             self.agentPosition = [random.randint(0,self.size-1), random.randint(0,self.size-1)]
 
         # Initialization of the time elapsed
@@ -187,7 +203,8 @@ class StochasticGridWorld_2D(gym.Env):
         
         # Assign the appropriate RL reward
 
-        if agentPosition_temp == self.targetPosition:
+        # if agentPosition_temp == self.targetPosition:
+        if agentPosition_temp in self.targetPosition:
             if stochasticRewards:
                 self.reward = np.random.normal(loc=self.R_max, scale=0.1)
             else:
@@ -273,3 +290,14 @@ class RandomPolicy():
 
     def chooseAction(self, state=None, value = None):
         return random.randint(0, self.n_actions - 1)
+
+class UpperPolicy():
+
+    def __init__(self, number_of_actions):
+        self.n_actions = number_of_actions
+    
+    def processState(self, state):
+        return state
+
+    def chooseAction(self, state=None, value = None):
+        return 3

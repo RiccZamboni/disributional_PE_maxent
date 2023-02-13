@@ -7,6 +7,11 @@
 import itertools
 import numpy  as np
 import matplotlib.pyplot as plt
+from itertools import combinations, islice
+from scipy.special import rel_entr
+from scipy.stats import entropy
+from math import comb
+import matplotlib.ticker
 
 
 ###############################################################################
@@ -49,10 +54,15 @@ def partition_k(collection, min, k):
     if len(smaller) < k: yield [ [ first ] ] + smaller
 
 def compute_kl(env, eta_0, eta_hat):
-    kl = 0
-    for s in range(len(env.state_space)):
-        kl += sum(eta_0[s,:]*np.log(eta_0[s,:] / eta_hat[s,:]))
+    eta_true = np.ravel(eta_0)
+    eta_est = np.ravel(eta_hat)
+    kl = sum(rel_entr(eta_true, eta_est))
     return kl
+
+def compute_entropy(env, eta_0):
+    eta = np.ravel(eta_0)
+    entr = entropy(eta)
+    return entr
 
 def partition(collection):
     if len(collection) == 1:
@@ -144,3 +154,52 @@ def algorithm_u(ns, m):
     for j in range(1, m + 1):
         a[n - m + j] = j - 1
     return f(m, n, 0, n, a)
+
+def get_partitions(iterable, minl=2):
+    s = set(iterable)
+    return [list(s)]+\
+           [[list(c), list(s.difference(c))]
+            for r in range(minl, len(s)//2+1)
+            for c in ( combinations(s, r) if len(s)//2 != r else
+             islice(combinations(s, r), comb(len(s),r)//2))
+           ]
+
+def compare_values(env, eta_hat, eta_hat_full, eta_true):
+    RMSE_hat = 0
+    RMSE_full = 0
+
+    for s in range(len(env.state_space)):
+        v_hat = np.dot(eta_hat[s][:], env.return_space)
+        v_hat_full = np.dot(eta_hat_full[s][:], env.return_space)
+
+        v_true = np.sum(eta_true[s][:])
+        RMSE_hat += (v_true - v_hat)**2
+        RMSE_full += (v_true - v_hat_full)**2
+    RMSE_full = np.sqrt(RMSE_full)
+    RMSE_hat = np.sqrt(RMSE_hat)
+    return RMSE_hat, RMSE_full
+
+def plot(v_est, v_full, samples, title, full_name):
+    fig, ax = plt.subplots()
+
+    font1 = {'family':'serif','color':'black','size':15}
+    font2 = {'family':'serif','color':'black','size':20}
+
+    v_max = max(max(v_est), max(v_full))
+    v_min = min(min(v_est), min(v_full))
+    ax.plot(samples, v_est, '--', label= 'Factorized Representation', linewidth=2.)
+    ax.plot(samples, v_full, '-.',  label= 'Full Representation', linewidth=2.)
+    plt.xlabel('N', fontdict = font1)
+    plt.ylabel('Normalized {}'.format(title), fontdict = font1)
+    plt.title('{} trend with number of samples'.format(title), fontdict = font2)
+    ax.grid()
+    plt.legend(loc='upper right')
+    ax.set_yticklabels(ax.get_yticks())
+
+    fig.savefig("images/PLOT_{}_{}.png".format(title, full_name))
+    
+
+
+def return_percentages(N, slices):
+    list_n = [int(N*portion) for portion in np.linspace(0.01, 1, slices)]
+    return list_n

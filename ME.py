@@ -32,16 +32,18 @@ TrajectoryLenght_std = 10000
 
 class ME():
 
-    def __init__(self, environment):
+    def __init__(self, environment, vectorized):
         
         # Initialization of important variables
         self.environment = environment
         self.delta = 0.98
         self.samplespace = environment.sample_space
         self.d_tuple = environment.d_tuple
+        self.vectorized = vectorized
+        self.div = 0
 
     def maxent_step(self, feature_class, exp_features):
-        model = maxentropy.MinDivergenceModel(features = feature_class.feature_vector, samplespace = self.samplespace, vectorized=False)
+        model = maxentropy.MinDivergenceModel(features = feature_class.feature_vector, samplespace = self.samplespace, vectorized=self.vectorized)
         model.verbose = False
         # Fit the model
         model.fit(exp_features)
