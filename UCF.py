@@ -9,7 +9,7 @@ from MCSampling import MonteCarloSampling as MonteCarloSampling
 from FCGenerator import FeatureGenerator as FeatureGenerator
 from ME import ME as ME
 
-from Utils import compute_kl, compute_entropy
+from Utils import compute_kl, compute_entropy, compare_expected_values, compute_kl_per_state
 
 ###############################################################################
 ################################ Global variables #############################
@@ -54,7 +54,7 @@ class FNode():
             self.sets = self.features.sets
             self.kl = compute_kl(self.optimizer.environment, self.optimizer.environment.true_dist, eta_hat)
             self.h_0 = compute_entropy(self.optimizer.environment, self.optimizer.environment.true_dist)
-            self.delta = 0.01
+            self.delta = 0.1
             self.Phi = self.optimizer.environment.R_max
             
             self.parent = parent
@@ -86,7 +86,7 @@ class FNode():
 
         def get_norm(self, lambda_hat):
             # lambda_norm = 10*norm(lambda_hat,  np.inf)
-            lambda_norm = 10*norm(lambda_hat,  np.inf)
+            lambda_norm = 10*norm(lambda_hat,  1)
             # il massimo lambda per Rmax = 1 e S_alpha = 1 è 2.39 MA non cambia comunque il trend
             # lambda_norm = 10*2.39
             return lambda_norm
@@ -98,6 +98,8 @@ class FNode():
 
             for leaf_down in self.children:
                 leaf_down.evaluate()
+                if leaf_down.norm < self.norm:
+                    pass
                 if leaf_down.B_tot <= node_star.B_tot:
                     not_expanded = False
                     node_star = leaf_down
@@ -162,7 +164,7 @@ class FNode():
 
 class UCF():
 
-    def __init__(self, env, policy, samples, vectorized,  gamma = g, trajSamples= numberOfSamples_std):
+    def __init__(self, env, policy, samples, vectorized, gamma = g, trajSamples= numberOfSamples_std):
         # Initialization of mportant variables
         self.environment = env
         self.policy = policy
@@ -173,6 +175,7 @@ class UCF():
         self.feature_generator = FeatureGenerator(self.environment, self.vectorized)
         self.features = self.feature_generator.features
         self.features_full = self.feature_generator.features_full
+        self.features_opt = self.feature_generator.features_opt
         self.optimizer = ME(self.environment, self.vectorized)
         self.samples = samples
         
@@ -193,19 +196,45 @@ class UCF():
         dummy = DummyNode(hyper_c, splits)
         node_s = FNode(self.optimizer, self.features, self.samples, parent = dummy)
         node_full = FNode(self.optimizer, self.features_full, self.samples, parent = dummy)
+        node_opt = FNode(self.optimizer, self.features_opt, self.samples, parent = dummy)
         node_s.evaluate()
         step = 0
         while not done and step < 10:
              node_s, done, step = node_s.greedy_search(step, greedy)
-             print("#######")
-             print("Factor done")
-             print("Set {}".format(node_s.sets))
-             print("L {}".format(node_s.L))
-             print("B {}".format(node_s.B))
-             print("KL {}".format(node_s.kl))
-             print("#######")
              greedy_search_result[str(step)] = node_s.extract(dict())
-        return greedy_search_result, node_s.eta_hat, node_full.eta_hat
+        return greedy_search_result, node_s.eta_hat, node_full.eta_hat, node_opt.eta_hat
+
+
+    def compare_distributions(self, greedy_search_result, eta_true, hyper_c, splits):
+        done = False
+        greedy = False
+        b_list = list()
+        kl_list = list()
+        dummy = DummyNode(hyper_c, splits)
+        node_s = FNode(self.optimizer, self.features, self.samples, parent = dummy)
+        node_s.evaluate()
+        # kl_list.append(compute_kl_per_state(self.environment, eta_true, node_s.eta_hat))
+        
+        node_full = FNode(self.optimizer, self.features_full, self.samples, parent = dummy)
+        node_full.evaluate()
+        node_opt = FNode(self.optimizer, self.features_opt, self.samples, parent = dummy)
+        node_opt.evaluate()
+        
+        # kl_full = compute_kl_per_state(self.environment, eta_true, node_full.eta_hat)
+        kl_full = compute_kl(self.environment, eta_true, node_full.eta_hat)
+        kl_opt = compute_kl(self.environment, eta_true, node_opt.eta_hat)
+        kl_list.append(compute_kl(self.environment, eta_true, node_s.eta_hat))
+        
+        b_full = node_full.L/hyper_c + node_full.B
+        b_opt = node_opt.L/hyper_c + node_opt.B
+        b_list.append(node_s.L/hyper_c + node_s.B)
+        step = 0
+        while not done and step < 10:
+            node_s, done, step = node_s.greedy_search(step, greedy)
+            kl_list.append(compute_kl(self.environment, eta_true, node_s.eta_hat))
+            b_list.append(node_s.L/hyper_c + node_s.B)
+            greedy_search_result[str(step)] = node_s.extract(dict())
+        return greedy_search_result, kl_list, b_list, kl_full, b_full, kl_opt, b_opt
 
 
 

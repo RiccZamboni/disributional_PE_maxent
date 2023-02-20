@@ -26,7 +26,9 @@ class FeatureGenerator(object):
         self.vectorized = vector
         self.features =  feature_class(self.env, self.vectorized, [self.env.state_space])
         self.features_full =  feature_class(self.env, self.vectorized, [[s] for s in self.env.state_space])
-        pass
+        set_double = [[s for s in range(h*self.env.high, h*self.env.high + self.env.size)]  for h in range(self.env.size)]
+        self.features_opt =  feature_class(self.env, self.vectorized, set_double)
+
 
     def expand_features(self, i_star = None, splits = 2):
         next_features = list()
