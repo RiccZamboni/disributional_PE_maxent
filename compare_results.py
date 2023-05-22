@@ -33,11 +33,10 @@ if(__name__ == '__main__'):
 
     # Retrieve the paramaters sent by the user
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument("-splits", default=2, type=int, help="number of splits")
-    parser.add_argument("-samples", default=500, type=int, help="number of samples")
-    parser.add_argument("-environment_size", default=4, type=int, help="environment size")
-    parser.add_argument("-environment_type", default='RECT', type=str, help="environment type")
-    parser.add_argument("-full_search", default=False, type=bool, help="search type")
+    parser.add_argument("-splits", default=2, type=int, help="number of splits K")
+    parser.add_argument("-samples", default=500, type=int, help="number of samples (trajectories)")
+    parser.add_argument("-environment_size", default=8, type=int, help="environment size")
+    parser.add_argument("-environment_type", default='RECT', type=str, help="environment type (see environment.py)")
     parser.add_argument("-vectorized", default=True, type=str, help="vectorized features")
     args = parser.parse_args()
 
